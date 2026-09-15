@@ -121,12 +121,37 @@ class FlowServeHandler(http.server.BaseHTTPRequestHandler):
             self.send_error(404, "Not Found")
 
 def run():
+    import argparse
+    parser = argparse.ArgumentParser(description="FlowServe DeepSeek Web Gateway")
+    parser.add_argument("--port", type=int, default=9000, help="Listening port (default: 9000)")
+    args = parser.parse_args()
+
+    port = args.port
+    max_retries = 20
+    httpd = None
+
     socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(("", PORT), FlowServeHandler) as httpd:
+
+    for attempt in range(max_retries):
+        try:
+            httpd = socketserver.TCPServer(("", port), FlowServeHandler)
+            break
+        except OSError as e:
+            if e.errno == 98:  # Address already in use
+                print(f"[Notice] Port {port} is occupied, trying port {port + 1}...")
+                port += 1
+            else:
+                raise
+
+    if not httpd:
+        print(f"[Error] Could not find an available port after {max_retries} attempts.")
+        sys.exit(1)
+
+    with httpd:
         print(f"===============================================================")
-        print(f"  FlowServe DeepSeek-Style Web Server Running on port {PORT}")
-        print(f"  Access UI:    http://localhost:{PORT}")
-        print(f"  API Endpoint: http://localhost:{PORT}/v1/chat/completions")
+        print(f"  FlowServe DeepSeek-Style Web Server Running on port {port}")
+        print(f"  Access UI:    http://localhost:{port}")
+        print(f"  API Endpoint: http://localhost:{port}/v1/chat/completions")
         print(f"  C++ Engine:   {CLI_PATH}")
         print(f"  Weights:      {WEIGHTS_PATH}")
         print(f"===============================================================")
