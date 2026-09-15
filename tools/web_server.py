@@ -35,7 +35,13 @@ class ResidentEngine:
     def generate(self, prompt, max_tokens):
         if not self.alive():
             raise RuntimeError("chat_cli --serve 未启动（检查 build/chat_cli 与 tinymla_story.bin）")
-        line = f"{int(max_tokens)}\t{prompt.replace(chr(10), ' ')}\n"
+        clean_p = prompt.strip()
+        # 智能对话格式封装：若非直接前缀，自动转为标准 User / Assistant 对话对
+        if not clean_p.startswith("User:") and "Assistant:" not in clean_p:
+            clean_p = f"User: {clean_p}\\nAssistant:"
+        else:
+            clean_p = clean_p.replace("\n", "\\n")
+        line = f"{int(max_tokens)}\t{clean_p}\n"
         with self.lock:
             self.proc.stdin.write(line.encode("utf-8"))
             self.proc.stdin.flush()
@@ -96,7 +102,7 @@ class FlowServeHandler(http.server.BaseHTTPRequestHandler):
         except json.JSONDecodeError:
             payload = {}
         prompt = payload.get("prompt", "")
-        max_tokens = int(payload.get("max_tokens", 48))
+        max_tokens = int(payload.get("max_tokens", 96))
         if not prompt:
             self.send_error(400, "prompt required")
             return
@@ -104,16 +110,23 @@ class FlowServeHandler(http.server.BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
         self.send_header("Cache-Control", "no-cache")
-        self.send_header("Connection", "keep-alive")
+        self.send_header("Connection", "close")
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
 
+        import codecs
+        utf8_decoder = codecs.getincrementaldecoder("utf-8")("replace")
         try:
             for ch in ENGINE.generate(prompt, max_tokens):
-                delta = ch.decode("utf-8", errors="ignore")
+                delta = utf8_decoder.decode(ch)
                 if not delta:
                     continue
                 chunk = json.dumps({"delta": delta}, ensure_ascii=False)
+                self.wfile.write(f"data: {chunk}\n\n".encode("utf-8"))
+                self.wfile.flush()
+            final_delta = utf8_decoder.decode(b"", final=True)
+            if final_delta:
+                chunk = json.dumps({"delta": final_delta}, ensure_ascii=False)
                 self.wfile.write(f"data: {chunk}\n\n".encode("utf-8"))
                 self.wfile.flush()
         except Exception as e:

@@ -48,6 +48,23 @@ static void generate_once(TransformerModel& model, Tokenizer& tok, const std::st
     }
 }
 
+static std::string unescape_prompt(const std::string& s) {
+    std::string out;
+    out.reserve(s.size());
+    for (size_t i = 0; i < s.size(); ++i) {
+        if (s[i] == '\\' && i + 1 < s.size() && s[i + 1] == 'n') {
+            out.push_back('\n');
+            ++i;
+        } else if (s[i] == '\\' && i + 1 < s.size() && s[i + 1] == 't') {
+            out.push_back('\t');
+            ++i;
+        } else {
+            out.push_back(s[i]);
+        }
+    }
+    return out;
+}
+
 static int run_serve(TransformerModel& model, Tokenizer& tok) {
     std::ios::sync_with_stdio(false);
     std::string line;
@@ -59,6 +76,7 @@ static int run_serve(TransformerModel& model, Tokenizer& tok) {
             max_gen = std::stoi(line.substr(0, tab));
             prompt = line.substr(tab + 1);
         }
+        prompt = unescape_prompt(prompt);
         generate_once(model, tok, prompt, max_gen, /*raw=*/true);
         std::cout.put('\0') << std::flush;
     }
@@ -124,6 +142,7 @@ int main(int argc, char** argv) {
         return run_serve(model, tok);
     }
 
+    prompt = unescape_prompt(prompt);
     generate_once(model, tok, prompt, max_gen, raw_mode);
     if (!raw_mode) {
         std::cout << "\n\n[DONE] Real tensor forward computation complete!\n";

@@ -464,16 +464,18 @@
             </div>
             <div class="stat-row">
                 <span class="stat-label">活跃模型</span>
-                <span class="stat-val">TinyMLA-Story</span>
+                <span class="stat-val">TinyMLA-Chat</span>
             </div>
         </div>
 
-        <div class="sidebar-section-title">快捷预设故事 Prompt</div>
+        <div class="sidebar-section-title">快捷预设对话 Prompt</div>
         <div style="display: flex; flex-direction: column; gap: 6px;">
-            <div class="deep-think-toggle" onclick="setPrompt('Once upon a time, Lily')">🌸 探险家 Lily</div>
-            <div class="deep-think-toggle" onclick="setPrompt('Once upon a time, Tom')">🐶 汤姆与小狗</div>
-            <div class="deep-think-toggle" onclick="setPrompt('Once upon a time, a small mouse')">🧀 分享奶酪的老鼠</div>
-            <div class="deep-think-toggle" onclick="setPrompt('Once upon a time, a brave bunny')">🐰 勇敢的小兔子</div>
+            <div class="deep-think-toggle" onclick="setPrompt('你好')">👋 打招呼 (你好)</div>
+            <div class="deep-think-toggle" onclick="setPrompt('Who are you?')">🤖 自我介绍 (Who are you?)</div>
+            <div class="deep-think-toggle" onclick="setPrompt('什么是 FlowServe？')">⚡ 什么是 FlowServe？</div>
+            <div class="deep-think-toggle" onclick="setPrompt('讲个笑话')">😄 讲个笑话</div>
+            <div class="deep-think-toggle" onclick="setPrompt('What is MLA?')">🧠 什么是 MLA 架构？</div>
+            <div class="deep-think-toggle" onclick="setPrompt('1加1等于几？')">🔢 趣味问答 (1+1)</div>
         </div>
 
         <div class="sidebar-footer">
@@ -486,7 +488,7 @@
         <header class="chat-header">
             <div class="chat-header-title">
                 <span class="status-dot"></span>
-                <span>TinyMLA 语言模型 (Native C++20 + CUDA)</span>
+                <span>TinyMLA 聊天机器人 (Native C++20 + CUDA)</span>
             </div>
             <div style="font-size: 13px; color: var(--text-secondary);">
                 纯自研 0 拷贝权重推理
@@ -499,9 +501,9 @@
                 <div class="avatar assistant">F</div>
                 <div class="bubble-wrapper">
                     <div class="bubble">
-                        你好！我是基于 <strong>FlowServe</strong> 高性能推理框架与 <strong>DeepSeek MLA 潜空间注意力架构</strong> 运行的语言模型。
+                        你好！我是基于 <strong>FlowServe</strong> 高性能推理引擎与 <strong>DeepSeek MLA 潜空间注意力架构</strong> 运行的 <strong>TinyMLA 聊天机器人</strong>。
                         <br><br>
-                        我已经由本地 <strong>RTX 5060 GPU</strong> 预训练完毕，拥有原生 C++20 协程与 Paged KV 显存优化。你可以随时点击左侧的故事 Prompt 或在下方输入开头，我将为你实时流式推演故事！
+                        我已经由本地 <strong>RTX 5060 GPU</strong> 预训练完成，支持中英文对话、技术答疑与极速流式推理。你可以随时点击左侧快捷问题或在下方输入消息，开启实时互动！
                     </div>
                 </div>
             </div>
@@ -510,7 +512,7 @@
         <!-- 底部输入栏 -->
         <div class="input-area">
             <div class="input-box">
-                <textarea class="input-textarea" id="promptInput" rows="1" placeholder="给故事起个开头，例如：Once upon a time, Lily..." onkeydown="handleKeyDown(event)"></textarea>
+                <textarea class="input-textarea" id="promptInput" rows="1" placeholder="输入问题或打招呼，例如：你好 / Who are you? / 什么是 FlowServe？..." onkeydown="handleKeyDown(event)"></textarea>
                 <div class="input-toolbar">
                     <div class="options-group"></div>
                     <button class="send-btn" id="sendBtn" onclick="sendMessage()">
