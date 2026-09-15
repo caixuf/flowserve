@@ -75,17 +75,30 @@ int main(int argc, char** argv) {
     std::vector<std::string> positional;
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
-        if (arg == "--raw") raw_mode = true;
-        else if (arg == "--serve") serve_mode = true;
-        else positional.push_back(std::move(arg));
+        if (arg == "--raw") {
+            raw_mode = true;
+        } else if (arg == "--serve") {
+            serve_mode = true;
+        } else if (arg == "--weights" && i + 1 < argc) {
+            weights_path = argv[++i];
+        } else if (arg == "--prompt" && i + 1 < argc) {
+            prompt = argv[++i];
+        } else if ((arg == "--max-tokens" || arg == "--max-gen") && i + 1 < argc) {
+            max_gen = std::stoi(argv[++i]);
+        } else if (arg.rfind("--", 0) != 0) {
+            positional.push_back(std::move(arg));
+        }
     }
 
-    if (!positional.empty()) {
-        if (serve_mode) weights_path = positional[0];
-        else prompt = positional[0];
+    if (weights_path.empty() && !positional.empty() && serve_mode) {
+        weights_path = positional[0];
+    } else if (!serve_mode) {
+        if (!positional.empty() && prompt == "Hello, flowserve!") {
+            prompt = positional[0];
+            if (positional.size() > 1 && weights_path.empty()) weights_path = positional[1];
+            if (positional.size() > 2) max_gen = std::stoi(positional[2]);
+        }
     }
-    if (!serve_mode && positional.size() > 1) weights_path = positional[1];
-    if (!serve_mode && positional.size() > 2) max_gen = std::stoi(positional[2]);
 
     if (!raw_mode && !serve_mode) {
         std::cout << "========================================================\n";
