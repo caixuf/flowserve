@@ -243,6 +243,30 @@ public:
         return best_tok;
     }
 
+    // 带重复惩罚的采样（仅对 ASCII 单字符/空格生效，保护 UTF-8 多字节汉字结构不被破坏）
+    int sample_with_penalty(const float* logits, const std::vector<int>& recent_tokens, float penalty = 1.3f) const {
+        const size_t V = config.vocab_size;
+        std::vector<float> mod_logits(logits, logits + V);
+        for (int tok : recent_tokens) {
+            if (tok >= 0 && static_cast<size_t>(tok) < V) {
+                // Tokenizer::BYTE_OFFSET = 3, 3..130 为 ASCII 字符。>=131 为 UTF-8 多字节分片，严禁盲目惩罚
+                if (tok <= 130) {
+                    if (mod_logits[tok] > 0.0f) mod_logits[tok] /= penalty;
+                    else mod_logits[tok] *= penalty;
+                }
+            }
+        }
+        int best_tok = 0;
+        float best_val = mod_logits[0];
+        for (size_t i = 1; i < V; ++i) {
+            if (mod_logits[i] > best_val) {
+                best_val = mod_logits[i];
+                best_tok = static_cast<int>(i);
+            }
+        }
+        return best_tok;
+    }
+
 private:
     void init_weights() {
         std::mt19937 rng(42);

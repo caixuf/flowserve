@@ -37,9 +37,14 @@ static void generate_once(TransformerModel& model, Tokenizer& tok, const std::st
     for (int t : prompt_tokens) {
         model.forward_step(t, logits.data());
     }
+    std::vector<int> recent_tokens;
     for (int step = 0; step < max_gen; ++step) {
-        int next_token = model.sample_greedy(logits.data());
+        int next_token = model.sample_with_penalty(logits.data(), recent_tokens, 1.4f);
         if (next_token == Tokenizer::EOS_TOKEN) break;
+        if (next_token == static_cast<int>('\n') + Tokenizer::BYTE_OFFSET) break;
+        recent_tokens.push_back(next_token);
+        if (recent_tokens.size() > 16) recent_tokens.erase(recent_tokens.begin());
+
         std::cout << tok.decode_token(next_token) << std::flush;
         if (!raw) {
             std::this_thread::sleep_for(std::chrono::milliseconds(20));

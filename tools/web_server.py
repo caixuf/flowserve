@@ -16,6 +16,86 @@ CLI_PATH = os.path.join(WORKSPACE_DIR, "build", "chat_cli")
 WEIGHTS_PATH = os.path.join(WORKSPACE_DIR, "tinymla_story.bin")
 
 
+def normalize_intent(user_input: str) -> str:
+    s = user_input.strip()
+    if s.startswith("User:") and "Assistant:" in s:
+        return s.replace("\n", "\\n")
+
+    low = s.lower()
+    # 1. 天气类
+    if any(k in low for k in ["天气", "weather", "晴", "雨", "冷", "热", "温度"]):
+        if any(k in low for k in ["不错", "好", "真好", "great", "nice"]):
+            return "User: 今天天气不错呀\\nAssistant:"
+        return "User: 今天天气怎么样？\\nAssistant:"
+
+    # 2. 身份与名称
+    if any(k in low for k in ["你是谁", "叫什么", "名字", "who are you", "what is your name", "who created you", "谁训练", "谁创造", "介绍"]):
+        if any(k in low for k in ["who are you", "who are u"]):
+            return "User: Who are you?\\nAssistant:"
+        if any(k in low for k in ["what is your name", "your name"]):
+            return "User: What is your name?\\nAssistant:"
+        if any(k in low for k in ["who created", "who made"]):
+            return "User: Who created you?\\nAssistant:"
+        if any(k in low for k in ["名字", "叫什么"]):
+            return "User: 你的名字叫什么？\\nAssistant:"
+        if any(k in low for k in ["谁训练", "谁创造"]):
+            return "User: 谁训练了你？\\nAssistant:"
+        return "User: 你是谁？\\nAssistant:"
+
+    # 3. 打招呼与日常
+    if any(k in low for k in ["早", "morning"]):
+        return "User: 早安\\nAssistant:"
+    if any(k in low for k in ["晚", "evening"]):
+        return "User: 晚上好\\nAssistant:"
+    if any(k in low for k in ["你好", "嗨", "哈喽", "hello", "hi", "hey"]):
+        return "User: 你好\\nAssistant:"
+
+    # 4. 日常闲聊
+    if any(k in low for k in ["吃", "饭", "meal"]):
+        return "User: 吃饭了吗？\\nAssistant:"
+    if any(k in low for k in ["干嘛", "在做", "干什么", "忙什么"]):
+        return "User: 在干嘛呢？\\nAssistant:"
+    if any(k in low for k in ["辛苦", "累"]):
+        return "User: 辛苦啦\\nAssistant:"
+    if any(k in low for k in ["哈哈", "笑死", "funny", "haha"]):
+        return "User: 哈哈\\nAssistant:"
+
+    # 5. 技术类
+    if any(k in low for k in ["flowserve", "推理", "引擎"]):
+        return "User: 什么是 FlowServe？\\nAssistant:"
+    if any(k in low for k in ["mla", "潜空间", "注意力"]):
+        return "User: 什么是 MLA？\\nAssistant:"
+    if any(k in low for k in ["flowcoro", "协程"]):
+        return "User: What is FlowCoro？\\nAssistant:"
+    if any(k in low for k in ["1f1b", "流水线", "gpipe"]):
+        return "User: 什么是 1F1B？\\nAssistant:"
+
+    # 6. 笑话
+    if any(k in low for k in ["笑话", "joke", "幽默", "逗我"]):
+        return "User: 讲个笑话\\nAssistant:"
+
+    # 7. 故事
+    if any(k in low for k in ["故事", "story", "童话", "从前"]):
+        return "User: 讲个故事\\nAssistant:"
+
+    # 8. 算术
+    if any(k in low for k in ["1+1", "1 + 1", "一加一", "1加1"]):
+        return "User: 1加1等于几？\\nAssistant:"
+
+    # 9. 感谢与再见
+    if any(k in low for k in ["谢谢", "thank", "多谢", "感恩"]):
+        return "User: 谢谢你\\nAssistant:"
+    if any(k in low for k in ["再见", "拜拜", "bye", "goodbye"]):
+        return "User: 再见\\nAssistant:"
+
+    # 10. 能做什么
+    if any(k in low for k in ["能做", "功能", "会什么", "what can you do"]):
+        return "User: 你能做什么？\\nAssistant:"
+
+    # 11. 其它兜底：如果有明确输入，包裹为 User / Assistant
+    return f"User: {s}\\nAssistant:"
+
+
 class ResidentEngine:
     def __init__(self, cli_path, weights_path):
         self.lock = threading.Lock()
@@ -35,12 +115,7 @@ class ResidentEngine:
     def generate(self, prompt, max_tokens):
         if not self.alive():
             raise RuntimeError("chat_cli --serve 未启动（检查 build/chat_cli 与 tinymla_story.bin）")
-        clean_p = prompt.strip()
-        # 智能对话格式封装：若非直接前缀，自动转为标准 User / Assistant 对话对
-        if not clean_p.startswith("User:") and "Assistant:" not in clean_p:
-            clean_p = f"User: {clean_p}\\nAssistant:"
-        else:
-            clean_p = clean_p.replace("\n", "\\n")
+        clean_p = normalize_intent(prompt)
         line = f"{int(max_tokens)}\t{clean_p}\n"
         with self.lock:
             self.proc.stdin.write(line.encode("utf-8"))
