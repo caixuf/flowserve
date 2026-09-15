@@ -79,6 +79,37 @@ int main() {
         c.prefix_cache = false;
         arms.push_back({"no_paged (reserve max_len)", c});
     }
+    {
+        ServingConfig c = base;
+        c.continuous_batching = true;
+        c.paged_kv = true;
+        c.prefix_cache = true;
+        c.enable_mla = true;
+        c.mla_latent_ratio = 4;
+        arms.push_back({"+ mla_latent_kv (4x)", c});
+    }
+    {
+        ServingConfig c = base;
+        c.continuous_batching = true;
+        c.paged_kv = true;
+        c.prefix_cache = true;
+        c.enable_speculative = true;
+        c.speculative_draft_tokens = 3;
+        c.speculative_acceptance_rate = 0.75;
+        arms.push_back({"+ speculative_decoding", c});
+    }
+    {
+        ServingConfig c = base;
+        c.continuous_batching = true;
+        c.paged_kv = true;
+        c.prefix_cache = true;
+        c.enable_mla = true;
+        c.mla_latent_ratio = 4;
+        c.enable_speculative = true;
+        c.speculative_draft_tokens = 3;
+        c.speculative_acceptance_rate = 0.75;
+        arms.push_back({"+ modern_stack (mla+spec)", c});
+    }
 
     std::cout << "flowserve bench n=64 prompt=32 gen=16 max_seqs=8 gap=120us\n";
     for (const auto& arm : arms) {

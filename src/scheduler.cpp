@@ -30,8 +30,12 @@ bool Scheduler::admit(uint64_t id, BlockManager& bm) {
 }
 
 bool Scheduler::ensure_decode_slot(Sequence& s, BlockManager& bm) {
-    const int next_tokens = static_cast<int>(s.token_ids.size()) + 1;
-    if (next_tokens > cfg_.max_model_len) return false;
+    const int step_delta = cfg_.enable_speculative ? (1 + cfg_.speculative_draft_tokens) : 1;
+    const int next_tokens = static_cast<int>(s.token_ids.size()) + step_delta;
+    if (next_tokens > cfg_.max_model_len) {
+        if (static_cast<int>(s.token_ids.size()) + 1 > cfg_.max_model_len) return false;
+        return bm.allocate_to_cover(s, static_cast<int>(s.token_ids.size()) + 1);
+    }
     if (!cfg_.paged_kv) return next_tokens <= cfg_.max_model_len;
     return bm.allocate_to_cover(s, next_tokens);
 }

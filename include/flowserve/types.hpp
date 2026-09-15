@@ -15,9 +15,21 @@ struct ServingConfig {
     bool continuous_batching{true};
     bool paged_kv{true};
     bool prefix_cache{true};
+    // MLA (Multi-Head Latent Attention): compress KV cache into latent vectors
+    bool enable_mla{false};
+    int mla_latent_ratio{4};
+    // Speculative Decoding: draft model fast proposal + verifier arbitration
+    bool enable_speculative{false};
+    int speculative_draft_tokens{3};
+    double speculative_acceptance_rate{0.75};
+    double draft_us_per_token{0.4};
     // Fake GPU cost model (microseconds of simulated device time).
     double prefill_us_per_token{2.0};
     double decode_us_per_seq{40.0};
+
+    int effective_block_size() const {
+        return (enable_mla && mla_latent_ratio > 1) ? block_size * mla_latent_ratio : block_size;
+    }
 };
 
 struct Sequence {
@@ -61,6 +73,9 @@ struct RunReport {
     double mean_ttft_us{0};
     double mean_tpot_us{0};
     double p95_ttft_us{0};
+    int speculative_drafted_tokens{0};
+    int speculative_accepted_tokens{0};
+    double speculative_speedup{1.0};
     std::vector<RequestMetric> per_request;
 };
 

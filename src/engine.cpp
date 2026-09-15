@@ -1,5 +1,6 @@
 #include "flowserve/engine.hpp"
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <limits>
 
@@ -24,7 +25,7 @@ static double percentile(std::vector<double> xs, double p) {
 
 RunReport Engine::run(const std::vector<WorkloadItem>& items) {
     Scheduler sched(cfg_);
-    BlockManager bm(cfg_.block_size, cfg_.num_gpu_blocks, cfg_.prefix_cache && cfg_.paged_kv);
+    BlockManager bm(cfg_.effective_block_size(), cfg_.num_gpu_blocks, cfg_.prefix_cache && cfg_.paged_kv);
 
     struct Pending {
         WorkloadItem item;
@@ -68,7 +69,12 @@ RunReport Engine::run(const std::vector<WorkloadItem>& items) {
         const int decode_n = static_cast<int>(sch.decode.size());
         double step_us = 0;
         if (prefill_tokens > 0) step_us += cfg_.prefill_us_per_token * prefill_tokens;
-        if (decode_n > 0) step_us += cfg_.decode_us_per_seq * decode_n;
+        if (decode_n > 0) {
+            step_us += cfg_.decode_us_per_seq * decode_n;
+            if (cfg_.enable_speculative) {
+                step_us += cfg_.draft_us_per_token * cfg_.speculative_draft_tokens * decode_n;
+            }
+        }
         if (step_us <= 0) {
             // Nothing scheduled: jump to next arrival.
             uint64_t next_arr = std::numeric_limits<uint64_t>::max();
@@ -90,10 +96,26 @@ RunReport Engine::run(const std::vector<WorkloadItem>& items) {
         }
         for (uint64_t id : sch.decode) {
             Sequence& s = sched.seq(id);
-            s.token_ids.push_back(fake_next_token(s));
-            s.num_computed = static_cast<int>(s.token_ids.size());
+            int tokens_to_gen = 1;
+            if (cfg_.enable_speculative) {
+                const int k = cfg_.speculative_draft_tokens;
+                const int accepted = std::clamp(static_cast<int>(std::round(k * cfg_.speculative_acceptance_rate)), 0, k);
+                tokens_to_gen = 1 + accepted;
+                report.speculative_drafted_tokens += k;
+                report.speculative_accepted_tokens += accepted;
+            }
+
+            for (int t = 0; t < tokens_to_gen; ++t) {
+                s.token_ids.push_back(fake_next_token(s));
+                s.num_computed = static_cast<int>(s.token_ids.size());
+                if (s.first_token_tick == 0) s.first_token_tick = static_cast<uint64_t>(now);
+                const int out = s.num_computed - s.prompt_len;
+                if (out >= s.max_new_tokens) {
+                    break;
+                }
+            }
+
             const int out = s.num_computed - s.prompt_len;
-            if (s.first_token_tick == 0) s.first_token_tick = static_cast<uint64_t>(now);
             if (out >= s.max_new_tokens) {
                 s.finish_tick = static_cast<uint64_t>(now);
                 RequestMetric m;

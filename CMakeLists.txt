@@ -35,5 +35,39 @@ target_link_libraries(test_engine_ablation PRIVATE flowserve)
 target_compile_options(test_engine_ablation PRIVATE -UNDEBUG)
 add_test(NAME test_engine_ablation COMMAND test_engine_ablation)
 
+add_executable(test_nn_primitives tests/test_nn_primitives.cpp)
+target_link_libraries(test_nn_primitives PRIVATE flowserve)
+target_compile_options(test_nn_primitives PRIVATE -UNDEBUG)
+add_test(NAME test_nn_primitives COMMAND test_nn_primitives)
+
+add_executable(test_speculative_and_mla tests/test_speculative_and_mla.cpp)
+target_link_libraries(test_speculative_and_mla PRIVATE flowserve)
+target_compile_options(test_speculative_and_mla PRIVATE -UNDEBUG)
+add_test(NAME test_speculative_and_mla COMMAND test_speculative_and_mla)
+
+add_executable(test_weight_loader tests/test_weight_loader.cpp)
+target_link_libraries(test_weight_loader PRIVATE flowserve)
+target_compile_options(test_weight_loader PRIVATE -UNDEBUG)
+add_test(NAME test_weight_loader COMMAND test_weight_loader)
+
+add_executable(test_async_engine tests/test_async_engine.cpp)
+target_link_libraries(test_async_engine PRIVATE flowserve)
+target_compile_options(test_async_engine PRIVATE -UNDEBUG)
+add_test(NAME test_async_engine COMMAND test_async_engine)
+
+add_executable(test_tokenizer tests/test_tokenizer.cpp)
+target_link_libraries(test_tokenizer PRIVATE flowserve)
+target_compile_options(test_tokenizer PRIVATE -UNDEBUG)
+add_test(NAME test_tokenizer COMMAND test_tokenizer)
+
+add_executable(test_transformer_forward tests/test_transformer_forward.cpp)
+target_link_libraries(test_transformer_forward PRIVATE flowserve)
+target_compile_options(test_transformer_forward PRIVATE -UNDEBUG)
+add_test(NAME test_transformer_forward COMMAND test_transformer_forward)
+
 add_executable(bench_serving tools/bench_serving.cpp)
 target_link_libraries(bench_serving PRIVATE flowserve)
+
+add_executable(chat_cli tools/chat_cli.cpp)
+target_link_libraries(chat_cli PRIVATE flowserve)
+
