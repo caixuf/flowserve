@@ -512,12 +512,7 @@
             <div class="input-box">
                 <textarea class="input-textarea" id="promptInput" rows="1" placeholder="给故事起个开头，例如：Once upon a time, Lily..." onkeydown="handleKeyDown(event)"></textarea>
                 <div class="input-toolbar">
-                    <div class="options-group">
-                        <div class="deep-think-toggle active" id="thinkToggle" onclick="toggleThink()">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
-                            深度思考 (R1 风格)
-                        </div>
-                    </div>
+                    <div class="options-group"></div>
                     <button class="send-btn" id="sendBtn" onclick="sendMessage()">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                     </button>
@@ -527,16 +522,9 @@
     </main>
 
     <script>
-        let enableThink = true;
         const container = document.getElementById('messagesContainer');
         const input = document.getElementById('promptInput');
         const sendBtn = document.getElementById('sendBtn');
-        const thinkToggle = document.getElementById('thinkToggle');
-
-        function toggleThink() {
-            enableThink = !enableThink;
-            thinkToggle.classList.toggle('active', enableThink);
-        }
 
         function setPrompt(text) {
             input.value = text;
@@ -583,7 +571,6 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         prompt: prompt,
-                        deep_think: enableThink,
                         max_tokens: 48
                     })
                 });
@@ -612,8 +599,8 @@
 
                         try {
                             const chunk = JSON.parse(dataStr);
-                            if (chunk.think && thinkBodyEl) {
-                                thinkBodyEl.innerText += chunk.think;
+                            if (chunk.error) {
+                                bubbleEl.innerText += "[error] " + chunk.error;
                             }
                             if (chunk.delta) {
                                 if (tokenCount === 0) {
@@ -629,8 +616,8 @@
                     }
                 }
             } catch (e) {
-                // 模拟离线降级演示 (直接调用已训练好的真实模型文本推演)
-                simulateOfflineStream(prompt, bubbleEl, thinkBodyEl, metricEl, startT);
+                bubbleEl.innerText = "请求失败: " + e.message;
+                sendBtn.disabled = false;
                 return;
             }
 
@@ -657,22 +644,9 @@
             const row = document.createElement('div');
             row.className = 'message-row assistant';
             
-            let thinkHtml = '';
-            if (enableThink) {
-                thinkHtml = `
-                    <div class="think-container">
-                        <div class="think-header" onclick="this.nextElementSibling.classList.toggle('collapsed')">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                            <span>思考过程 (DeepSeek Style)</span>
-                        </div>
-                        <div class="think-body" id="currentThink"></div>
-                    </div>`;
-            }
-
             row.innerHTML = `
                 <div class="avatar assistant">F</div>
                 <div class="bubble-wrapper">
-                    ${thinkHtml}
                     <div class="bubble" id="currentBubble"><span class="cursor-blink"></span></div>
                     <div class="metric-badge" id="currentMetric">推演计算中...</div>
                 </div>`;
@@ -680,35 +654,9 @@
             container.scrollTop = container.scrollHeight;
 
             const bubbleEl = row.querySelector('#currentBubble');
-            const thinkBodyEl = row.querySelector('#currentThink');
+            const thinkBodyEl = null;
             const metricEl = row.querySelector('#currentMetric');
             return { bubbleEl, thinkBodyEl, metricEl };
-        }
-
-        function simulateOfflineStream(prompt, bubbleEl, thinkBodyEl, metricEl, startT) {
-            bubbleEl.innerHTML = '';
-            if (thinkBodyEl) {
-                thinkBodyEl.innerText = `1. 用户输入 Prompt: "${prompt}"\n2. Tokenizer 字节级匹配完成 (无 OOV 风险)\n3. 检索 MLA 潜空间 KV Cache，命中前缀哈希\n4. RTX 5060 启动 2 层 Transformer 自回归矩阵推演...`;
-            }
-
-            // 故事候选库
-            let text = " had a magic flower that would glow brightly in the dark night.";
-            if (prompt.includes("Tom")) text = " and his dog went to the big river. They saw pretty fish jumping.";
-            else if (prompt.includes("mouse")) text = " shared his cheese with an owl. They became good friends.";
-            else if (prompt.includes("bunny")) text = " jumped over the river and found a garden of sweet carrots.";
-
-            let idx = 0;
-            const timer = setInterval(() => {
-                if (idx < text.length) {
-                    bubbleEl.innerText += text[idx++];
-                    container.scrollTop = container.scrollHeight;
-                } else {
-                    clearInterval(timer);
-                    const totalT = Math.round(performance.now() - startT);
-                    metricEl.innerText = `TTFT: 24ms | TPOT: 12ms | Tokens: ${text.length} | MLA 显存压缩: 4.0x`;
-                    sendBtn.disabled = false;
-                }
-            }, 25);
         }
 
         function escapeHtml(str) {

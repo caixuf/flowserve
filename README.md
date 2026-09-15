@@ -47,6 +47,8 @@ ctest --test-dir build --output-on-failure
 
 ```bash
 ./build/chat_cli "Hello, flowserve!"
+python3 tools/web_server.py --port 9000
+# 常驻引擎：chat_cli --serve tinymla_story.bin ，协议 `max_tokens\\tprompt\\n` → 字节流 + NUL
 ```
 输出演示：
 - Byte-level Tokenizer 完成文本与字节 Token 的双向映射（零 OOV 风险）；
