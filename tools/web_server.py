@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""托管 frontend，并把 /v1/chat/completions 接到常驻 chat_cli --serve。"""
+"""托管 frontend，默认接到 Qwen2.5-0.5B；可用 --backend tinymla 回退 chat_cli。"""
 
 import argparse
 import http.server
@@ -13,91 +13,19 @@ import threading
 WORKSPACE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND_FILE = os.path.join(WORKSPACE_DIR, "frontend", "index.html")
 CLI_PATH = os.path.join(WORKSPACE_DIR, "build", "chat_cli")
-WEIGHTS_PATH = os.path.join(WORKSPACE_DIR, "tinymla_story.bin")
+QWEN_DIR = os.path.join(os.path.dirname(WORKSPACE_DIR), "qwen_chatbot")
+_CHAT_BIN = os.path.join(WORKSPACE_DIR, "tinymla_chat.bin")
+_STORY_BIN = os.path.join(WORKSPACE_DIR, "tinymla_story.bin")
+WEIGHTS_PATH = _CHAT_BIN if os.path.exists(_CHAT_BIN) else _STORY_BIN
+
+if QWEN_DIR not in sys.path:
+    sys.path.insert(0, QWEN_DIR)
 
 
-def normalize_intent(user_input: str) -> str:
-    s = user_input.strip()
-    if s.startswith("User:") and "Assistant:" in s:
-        return s.replace("\n", "\\n")
-
-    low = s.lower()
-    # 1. 天气类
-    if any(k in low for k in ["天气", "weather", "晴", "雨", "冷", "热", "温度"]):
-        if any(k in low for k in ["不错", "好", "真好", "great", "nice"]):
-            return "User: 今天天气不错呀\\nAssistant:"
-        return "User: 今天天气怎么样？\\nAssistant:"
-
-    # 2. 身份与名称
-    if any(k in low for k in ["你是谁", "叫什么", "名字", "who are you", "what is your name", "who created you", "谁训练", "谁创造", "介绍"]):
-        if any(k in low for k in ["who are you", "who are u"]):
-            return "User: Who are you?\\nAssistant:"
-        if any(k in low for k in ["what is your name", "your name"]):
-            return "User: What is your name?\\nAssistant:"
-        if any(k in low for k in ["who created", "who made"]):
-            return "User: Who created you?\\nAssistant:"
-        if any(k in low for k in ["名字", "叫什么"]):
-            return "User: 你的名字叫什么？\\nAssistant:"
-        if any(k in low for k in ["谁训练", "谁创造"]):
-            return "User: 谁训练了你？\\nAssistant:"
-        return "User: 你是谁？\\nAssistant:"
-
-    # 3. 打招呼与日常
-    if any(k in low for k in ["早", "morning"]):
-        return "User: 早安\\nAssistant:"
-    if any(k in low for k in ["晚", "evening"]):
-        return "User: 晚上好\\nAssistant:"
-    if any(k in low for k in ["你好", "嗨", "哈喽", "hello", "hi", "hey"]):
-        return "User: 你好\\nAssistant:"
-
-    # 4. 日常闲聊
-    if any(k in low for k in ["吃", "饭", "meal"]):
-        return "User: 吃饭了吗？\\nAssistant:"
-    if any(k in low for k in ["干嘛", "在做", "干什么", "忙什么"]):
-        return "User: 在干嘛呢？\\nAssistant:"
-    if any(k in low for k in ["辛苦", "累"]):
-        return "User: 辛苦啦\\nAssistant:"
-    if any(k in low for k in ["哈哈", "笑死", "funny", "haha"]):
-        return "User: 哈哈\\nAssistant:"
-
-    # 5. 技术类
-    if any(k in low for k in ["flowserve", "推理", "引擎"]):
-        return "User: 什么是 FlowServe？\\nAssistant:"
-    if any(k in low for k in ["mla", "潜空间", "注意力"]):
-        return "User: 什么是 MLA？\\nAssistant:"
-    if any(k in low for k in ["flowcoro", "协程"]):
-        return "User: What is FlowCoro？\\nAssistant:"
-    if any(k in low for k in ["1f1b", "流水线", "gpipe"]):
-        return "User: 什么是 1F1B？\\nAssistant:"
-
-    # 6. 笑话
-    if any(k in low for k in ["笑话", "joke", "幽默", "逗我"]):
-        return "User: 讲个笑话\\nAssistant:"
-
-    # 7. 故事
-    if any(k in low for k in ["故事", "story", "童话", "从前"]):
-        return "User: 讲个故事\\nAssistant:"
-
-    # 8. 算术
-    if any(k in low for k in ["1+1", "1 + 1", "一加一", "1加1"]):
-        return "User: 1加1等于几？\\nAssistant:"
-
-    # 9. 感谢与再见
-    if any(k in low for k in ["谢谢", "thank", "多谢", "感恩"]):
-        return "User: 谢谢你\\nAssistant:"
-    if any(k in low for k in ["再见", "拜拜", "bye", "goodbye"]):
-        return "User: 再见\\nAssistant:"
-
-    # 10. 能做什么
-    if any(k in low for k in ["能做", "功能", "会什么", "what can you do"]):
-        return "User: 你能做什么？\\nAssistant:"
-
-    # 11. 其它兜底：如果有明确输入，包裹为 User / Assistant
-    return f"User: {s}\\nAssistant:"
-
-
-class ResidentEngine:
+class TinyMlaEngine:
     def __init__(self, cli_path, weights_path):
+        self.kind = "tinymla"
+        self.model_path = weights_path
         self.lock = threading.Lock()
         self.proc = None
         if os.path.exists(cli_path) and os.path.exists(weights_path):
@@ -114,9 +42,9 @@ class ResidentEngine:
 
     def generate(self, prompt, max_tokens):
         if not self.alive():
-            raise RuntimeError("chat_cli --serve 未启动（检查 build/chat_cli 与 tinymla_story.bin）")
-        clean_p = normalize_intent(prompt)
-        line = f"{int(max_tokens)}\t{clean_p}\n"
+            raise RuntimeError("chat_cli --serve 未启动")
+        clean = prompt.replace("\n", " ")
+        line = f"{int(max_tokens)}\tUser: {clean}\\nAssistant:\n"
         with self.lock:
             self.proc.stdin.write(line.encode("utf-8"))
             self.proc.stdin.flush()
@@ -126,7 +54,7 @@ class ResidentEngine:
                     raise RuntimeError("chat_cli 已退出")
                 if ch == b"\0":
                     break
-                yield ch
+                yield ch.decode("utf-8", errors="ignore")
 
     def close(self):
         if self.proc and self.proc.poll() is None:
@@ -158,7 +86,12 @@ class FlowServeHandler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(content)
         elif self.path == "/health":
-            body = json.dumps({"status": "ok", "engine_alive": ENGINE.alive()}).encode()
+            body = json.dumps({
+                "status": "ok",
+                "engine": getattr(ENGINE, "kind", "unknown"),
+                "model_path": getattr(ENGINE, "model_path", ""),
+                "engine_alive": ENGINE.alive(),
+            }).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
@@ -177,7 +110,7 @@ class FlowServeHandler(http.server.BaseHTTPRequestHandler):
         except json.JSONDecodeError:
             payload = {}
         prompt = payload.get("prompt", "")
-        max_tokens = int(payload.get("max_tokens", 96))
+        max_tokens = int(payload.get("max_tokens", 256))
         if not prompt:
             self.send_error(400, "prompt required")
             return
@@ -189,19 +122,11 @@ class FlowServeHandler(http.server.BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
 
-        import codecs
-        utf8_decoder = codecs.getincrementaldecoder("utf-8")("replace")
         try:
-            for ch in ENGINE.generate(prompt, max_tokens):
-                delta = utf8_decoder.decode(ch)
+            for delta in ENGINE.generate(prompt, max_tokens):
                 if not delta:
                     continue
                 chunk = json.dumps({"delta": delta}, ensure_ascii=False)
-                self.wfile.write(f"data: {chunk}\n\n".encode("utf-8"))
-                self.wfile.flush()
-            final_delta = utf8_decoder.decode(b"", final=True)
-            if final_delta:
-                chunk = json.dumps({"delta": final_delta}, ensure_ascii=False)
                 self.wfile.write(f"data: {chunk}\n\n".encode("utf-8"))
                 self.wfile.flush()
         except Exception as e:
@@ -225,9 +150,18 @@ def run():
     global ENGINE
     parser = argparse.ArgumentParser(description="FlowServe web gateway")
     parser.add_argument("--port", type=int, default=9000)
+    parser.add_argument("--backend", choices=("qwen", "tinymla"), default="qwen")
+    parser.add_argument("--weights", default=WEIGHTS_PATH, help="tinymla FLSV 或覆盖 Qwen 目录")
     args = parser.parse_args()
 
-    ENGINE = ResidentEngine(CLI_PATH, WEIGHTS_PATH)
+    if args.backend == "qwen":
+        from engine import QwenChatEngine, default_model_dir
+        model_path = args.weights if os.path.isdir(args.weights) else default_model_dir()
+        print(f"Loading Qwen2.5-0.5B from {model_path} ...")
+        ENGINE = QwenChatEngine(model_path)
+        ENGINE.kind = "qwen2.5-0.5b"
+    else:
+        ENGINE = TinyMlaEngine(CLI_PATH, args.weights)
 
     port = args.port
     httpd = None
@@ -247,13 +181,14 @@ def run():
 
     print(f"UI  http://localhost:{port}")
     print(f"API http://localhost:{port}/v1/chat/completions")
-    print(f"cli {CLI_PATH}  weights {WEIGHTS_PATH}  alive={ENGINE.alive()}")
+    print(f"backend {getattr(ENGINE, 'kind', '?')}  model {getattr(ENGINE, 'model_path', '')}  alive={ENGINE.alive()}")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
         print("\nshutdown")
     finally:
-        ENGINE.close()
+        if hasattr(ENGINE, "close"):
+            ENGINE.close()
         httpd.server_close()
 
 

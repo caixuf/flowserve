@@ -488,10 +488,10 @@
         <header class="chat-header">
             <div class="chat-header-title">
                 <span class="status-dot"></span>
-                <span>TinyMLA 聊天机器人 (Native C++20 + CUDA)</span>
+                <span>Qwen2.5-0.5B（QLoRA 人设）</span>
             </div>
             <div style="font-size: 13px; color: var(--text-secondary);">
-                纯自研 0 拷贝权重推理
+                HuggingFace 推理 · FlowServe 页面
             </div>
         </header>
 
@@ -501,9 +501,9 @@
                 <div class="avatar assistant">F</div>
                 <div class="bubble-wrapper">
                     <div class="bubble">
-                        你好！我是基于 <strong>FlowServe</strong> 高性能推理引擎与 <strong>DeepSeek MLA 潜空间注意力架构</strong> 运行的 <strong>TinyMLA 聊天机器人</strong>。
+                        你好！我是 <strong>Qwen2.5-0.5B-Instruct</strong> 经本地 QLoRA 微调后的助手，页面由 FlowServe 托管。
                         <br><br>
-                        我已经由本地 <strong>RTX 5060 GPU</strong> 预训练完成，支持中英文对话、技术答疑与极速流式推理。你可以随时点击左侧快捷问题或在下方输入消息，开启实时互动！
+                        调度演示仍走 TinyMLA / C++ 引擎；这个对话框走 0.5B GPU 生成。直接提问即可。
                     </div>
                 </div>
             </div>
@@ -573,7 +573,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         prompt: prompt,
-                        max_tokens: 48
+                        max_tokens: 256
                     })
                 });
 
@@ -626,7 +626,7 @@
             // 完成指标渲染
             const totalTime = Math.round(performance.now() - startT);
             const tpot = tokenCount > 1 ? Math.round((totalTime - ttft) / (tokenCount - 1)) : totalTime;
-            metricEl.innerText = `TTFT: ${ttft}ms | TPOT: ${tpot}ms | Tokens: ${tokenCount} | MLA 显存压缩: 4.0x`;
+            metricEl.innerText = `TTFT: ${ttft}ms | TPOT: ${tpot}ms | chunks: ${tokenCount} | Qwen2.5-0.5B`;
             sendBtn.disabled = false;
         }
 
