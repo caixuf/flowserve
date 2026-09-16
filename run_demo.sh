@@ -21,14 +21,14 @@ function print_banner() {
     echo "       FlowServe & FlowTrain 双轨制高并发服务体系总控           "
     echo "================================================================"
     echo -e "${NC}"
-    echo -e "  ${BLUE}展台 A${NC}：Qwen2.5-0.5B (QLoRA 人设) · 现场聪明出声与自由问答"
-    echo -e "  ${GREEN}展台 B${NC}：FlowServe C++20 引擎 · Paged KV / MLA / 协程流控硬核调度"
+    echo -e "  ${BLUE}网页对话${NC}：Qwen2.5-0.5B-Instruct（默认，不是 LoRA merge）"
+    echo -e "  ${GREEN}调度实验${NC}：FlowServe C++ · Paged KV / 连续批 / TinyMLA FLSV"
     echo "----------------------------------------------------------------"
 }
 
 function run_web() {
     echo -e "\n${GREEN}🚀 启动 FlowServe 统一 Web 演示网关 (端口: 9000)...${NC}"
-    echo -e "   默认挂载：${BOLD}Qwen2.5-0.5B-Instruct${NC} 聪明对话模型"
+    echo -e "   默认：${BOLD}Qwen2.5-0.5B-Instruct${NC}（Transformers，与 C++ 调度分离）"
     echo -e "   访问地址：${BLUE}http://localhost:9000${NC}\n"
     python3 "${SCRIPT_DIR}/tools/web_server.py" --port 9000 --backend qwen
 }
